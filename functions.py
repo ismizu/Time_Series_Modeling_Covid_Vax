@@ -118,7 +118,7 @@ def table_cleaner(state_abbreviated,
     #Fill early hospital data with 0
     death_hosp['hospitalizations'] = death_hosp['hospitalizations'].fillna(0)
     #Resample as weekly data
-    death_hosp = death_hosp.resample('W').mean()
+    death_hosp = death_hosp.resample('W').sum()
     
     #----- Vax Data -----#
     
