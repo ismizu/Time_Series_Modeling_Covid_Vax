@@ -174,9 +174,6 @@ def table_cleaner(state_abbreviated,
     pickle.dump(outliers, pickle_holidays)
     pickle_holidays.close()
 
-
-
-
 def make_model(state_abbreviation):
     
     '''
@@ -316,3 +313,295 @@ def make_model(state_abbreviation):
     pickle_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','wb')
     pickle.dump(hosp_model, pickle_hosp_model)
     pickle_hosp_model.close()
+
+def score_check(state_abbreviation, save_df):
+    
+    '''
+    Run a cross validation for each model
+    User indicates dataframe to save results to
+    '''
+    
+    #----- Initial Data Load -----#
+    load_dose_one_model = open(f'pickled_data/models_pickled/{state_abbreviation}_dose_one_model.pickle','rb')
+    dose_one_model = pickle.load(load_dose_one_model)
+    load_dose_one_model.close()
+
+    load_series_complete_model = open(f'pickled_data/models_pickled/{state_abbreviation}_series_complete_model.pickle','rb')
+    series_complete_model = pickle.load(load_series_complete_model)
+    load_series_complete_model.close()
+    
+    load_deaths_model = open(f'pickled_data/models_pickled/{state_abbreviation}_deaths_model.pickle','rb')
+    deaths_model = pickle.load(load_deaths_model)
+    load_deaths_model.close()
+
+    load_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','rb')
+    hosp_model = pickle.load(load_hosp_model)
+    load_hosp_model.close()
+    
+    #----- Vax Cross Validation -----#
+    dose_one_cv = cross_validation(dose_one_model,
+                                   horizon = '4 W',
+                                   disable_tqdm = True)
+    
+    dose_one_mape = performance_metrics(dose_one_cv[dose_one_cv['y'] > 0 ]).iloc[-1]['mape']
+    
+    
+    series_complete_cv = cross_validation(series_complete_model,
+                                          horizon = '4 W',
+                                          disable_tqdm = True)
+    
+    series_complete_mape = performance_metrics(series_complete_cv[series_complete_cv['y'] > 0 ]).iloc[-1]['mape']
+    
+    #----- Hospitalization/Fatality Cross Validation -----#
+    deaths_model_cv = cross_validation(deaths_model,
+                                       horizon = '4 W',
+                                       period = '12 W',
+                                       disable_tqdm = True)
+    
+    deaths_model_mape = performance_metrics(deaths_model_cv[deaths_model_cv['y'] > 0 ]).iloc[-1]['mape']
+    
+    
+    hosp_model_cv = cross_validation(hosp_model,
+                                     horizon = '4 W',
+                                     period = '12 W',
+                                     disable_tqdm = True)
+    
+    hosp_model_mape = performance_metrics(hosp_model_cv[hosp_model_cv['y'] > 0 ]).iloc[-1]['mape']
+    
+    #Return append to dataframe
+    return save_df.append({'state': state_abbreviation,
+                           'dose_one_score': round(dose_one_mape, 2),
+                           'series_complete_score': round(series_complete_mape, 2),
+                           'fatality_score': round(deaths_model_mape, 2),
+                           'hosp_score': round(hosp_model_mape, 2)
+                          },
+                          ignore_index = True
+                         )
+
+def vax_params(state_abbreviation):
+    
+    '''
+    Run a grid search to retrieve vax models' best settings
+    '''
+    
+    #----- Initial Data Load -----#
+    
+    load_state_df = open(f'pickled_data/state_data_pickled/{state_abbreviation}_final_df.pickle','rb')
+    the_state_df = pickle.load(load_state_df)
+    load_state_df.close()
+
+    load_state_outliers = open(f'pickled_data/state_data_pickled/{state_abbreviation}_outliers.pickle','rb')
+    state_outliers = pickle.load(load_state_outliers)
+    load_state_outliers.close()
+    
+    #Separate Regressors to run predictions on
+    #Rename to Prophet naming conventions
+    dose_one_df = the_state_df[['ds', 'administered_dose1_pop_pct']].rename(columns = {'administered_dose1_pop_pct': 'y'})
+    series_complete_df = the_state_df[['ds', 'series_complete_pop_pct']].rename(columns = {'series_complete_pop_pct': 'y'})
+    
+    
+    #----- Grid Searches -----#
+    
+    #Create parameters
+    dose_one_param_grid = {  
+        'changepoint_prior_scale': [.1, .5, 1, 3],
+        'n_changepoints': [30]
+    }
+    dose_one_all_params = [dict(zip(dose_one_param_grid.keys(), v)) for v in itertools.product(*dose_one_param_grid.values())]
+    dose_one_rmses = []
+    
+    #Check performance for all iterations of parameters
+    for params in dose_one_all_params:
+        dose_one_m = Prophet(**params).fit(dose_one_df[dose_one_df['y'] > 0])
+        dose_one_df_cv = cross_validation(dose_one_m, horizon='4 W', disable_tqdm = True)
+        dose_one_df_p = performance_metrics(dose_one_df_cv, rolling_window = 1)
+        dose_one_rmses.append(dose_one_df_p['rmse'].values[0])
+    
+    #Retrieve best parameters
+    dose_one_best_params = dose_one_all_params[np.argmin(dose_one_rmses)]
+    
+    #Create parameters
+    series_complete_param_grid = {  
+        'changepoint_prior_scale': [.1, .5, 1, 3],
+        'n_changepoints': [30]
+    }
+    series_complete_all_params = [dict(zip(series_complete_param_grid.keys(), v)) for v in itertools.product(*series_complete_param_grid.values())]
+    series_complete_rmses = []
+    
+    #Check performance for all iterations of parameters
+    for params in series_complete_all_params:
+        series_complete_m = Prophet(**params).fit(series_complete_df[series_complete_df['y'] > 0])
+        series_complete_df_cv = cross_validation(series_complete_m, horizon='4 W', disable_tqdm = True)
+        series_complete_df_p = performance_metrics(series_complete_df_cv, rolling_window = 1)
+        series_complete_rmses.append(series_complete_df_p['rmse'].values[0])
+    
+    #Retrieve best parameters
+    series_complete_best_params = series_complete_all_params[np.argmin(series_complete_rmses)]
+    
+    #Save parameters
+    pickle_dose_one_param = open(f'pickled_data/model_params/{state_abbreviation}_dose_one_param.pickle','wb')
+    pickle.dump(dose_one_best_params['changepoint_prior_scale'], pickle_dose_one_param)
+    pickle_dose_one_param.close()
+
+    pickle_series_complete_param = open(f'pickled_data/model_params/{state_abbreviation}_series_complete_param.pickle','wb')
+    pickle.dump(series_complete_best_params['changepoint_prior_scale'], pickle_series_complete_param)
+    pickle_series_complete_param.close()
+
+
+def main_params(state_abbreviation):
+    
+    '''
+    Run a gridsearch to retrieve hospitalization/fatality models' best settings
+    '''
+    
+    #----- Initial Data Load -----#
+    
+    load_state_df = open(f'pickled_data/state_data_pickled/{state_abbreviation}_final_df.pickle','rb')
+    the_state_df = pickle.load(load_state_df)
+    load_state_df.close()
+
+    load_state_outliers = open(f'pickled_data/state_data_pickled/{state_abbreviation}_outliers.pickle','rb')
+    state_outliers = pickle.load(load_state_outliers)
+    load_state_outliers.close()
+    
+    #Separate targets
+    #Rename to Prophet naming conventions
+    state_deaths = the_state_df.drop(columns = 'hospitalizations').rename(columns = {'deaths': 'y'})
+    state_hospitalizations = the_state_df.drop(columns = 'deaths').rename(columns = {'hospitalizations': 'y'})
+    
+    #Create parameters
+    deaths_param_grid = {  
+        'changepoint_prior_scale': [.5, 1, 3],
+        'changepoint_range': [.85, .90, .95, 1],
+        'n_changepoints': [30],
+        'holidays': [state_outliers[state_outliers['holiday'] == 'deaths_outliers']]
+    }
+    deaths_all_params = [dict(zip(deaths_param_grid.keys(), v)) for v in itertools.product(*deaths_param_grid.values())]
+    deaths_rmses = []
+    
+    #Check performance for all iterations of parameters
+    for params in deaths_all_params:
+        deaths_m = Prophet(**params)
+        
+        deaths_m.add_regressor('administered_dose1_pop_pct')
+        deaths_m.add_regressor('series_complete_pop_pct')
+        
+        deaths_m.fit(state_deaths)
+        
+        deaths_df_cv = cross_validation(deaths_m,
+                                        horizon= '4 W',
+                                        period = '12 W',
+                                        disable_tqdm = True)
+        deaths_df_p = performance_metrics(deaths_df_cv[deaths_df_cv['y'] > 0], rolling_window = 1)
+        deaths_rmses.append(deaths_df_p['rmse'].values[0])
+    
+    #Retrieve best parameters
+    deaths_best_params = deaths_all_params[np.argmin(deaths_rmses)]
+    
+    #Create parameters
+    hosp_param_grid = {  
+        'changepoint_prior_scale': [.5, 1, 3, 4, 5],
+        'changepoint_range': [.85, .90, .95, 1],
+        'n_changepoints': [30],
+        'holidays': [state_outliers[state_outliers['holiday'] == 'hosp_outliers']]
+    }
+    hosp_all_params = [dict(zip(hosp_param_grid.keys(), v)) for v in itertools.product(*hosp_param_grid.values())]
+    hosp_rmses = []
+    
+    #Check performance for all iterations of parameters
+    for params in hosp_all_params:
+        hosp_m = Prophet(**params)
+        
+        hosp_m.add_regressor('administered_dose1_pop_pct')
+        hosp_m.add_regressor('series_complete_pop_pct')
+        
+        hosp_m.fit(state_hospitalizations)
+        
+        hosp_df_cv = cross_validation(hosp_m,
+                                      horizon= '4 W',
+                                      period = '12 W',
+                                      disable_tqdm = True)
+        hosp_df_p = performance_metrics(hosp_df_cv[hosp_df_cv['y'] > 0], rolling_window = 1)
+        hosp_rmses.append(hosp_df_p['rmse'].values[0])
+    
+    #Retrieve best parameters
+    hosp_best_params = hosp_all_params[np.argmin(hosp_rmses)]
+    
+    #Save parameters
+    pickle_deaths_params = open(f'pickled_data/model_params/{state_abbreviation}_deaths_params.pickle','wb')
+    pickle.dump(deaths_best_params, pickle_deaths_params)
+    pickle_deaths_params.close()
+    
+    pickle_hosp_params = open(f'pickled_data/model_params/{state_abbreviation}_hosp_params.pickle','wb')
+    pickle.dump(hosp_best_params, pickle_hosp_params)
+    pickle_hosp_params.close()
+
+
+def visualization_predictions(state_abbreviation, multiplier):
+    
+    '''
+    Create predictions based on vax multiplier
+    '''
+    
+    #----- Data Load In ----- #
+    load_deaths_model = open(f'pickled_data/models_pickled/{state_abbreviation}_deaths_model.pickle','rb')
+    deaths_model = pickle.load(load_deaths_model)
+    load_deaths_model.close()
+    
+    load_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','rb')
+    hosp_model = pickle.load(load_hosp_model)
+    load_hosp_model.close()
+    
+    load_vax_pred = open(f'pickled_data/state_vax_pred_pickled/{state_abbreviation}_vax_pred_df.pickle','rb')
+    vax_pred_df = pickle.load(load_vax_pred)
+    load_vax_pred.close()
+    
+    #Separate deaths/hospitalizations and rename columns
+    state_deaths = vax_pred_df.drop(columns = 'hospitalizations').rename(columns = {'deaths': 'y'})
+    state_hospitalizations = vax_pred_df.drop(columns = 'deaths').rename(columns = {'hospitalizations': 'y'})
+    
+    #----- Fatality Predictions -----#
+    
+    #Create future dataframe for predictions
+    deaths_future = deaths_model.make_future_dataframe(periods = 4, freq = 'W')
+    
+    #Add regressor columns to future dataframe
+    columns = ['administered_dose1_pop_pct', 'series_complete_pop_pct']
+    #Multiplier to allow value alterations
+    deaths_future[columns] = state_deaths[columns] * multiplier
+    #Cap max vaccination rate at 100%
+    deaths_future[columns[0]].clip(upper = 100., inplace = True)
+    deaths_future[columns[1]].clip(upper = 100., inplace = True)
+    
+    #Create predictions, cap lower limit as 0
+    deaths_forecast = deaths_model.predict(deaths_future)
+    deaths_forecast['yhat'].clip(lower = 0, inplace = True)
+   
+    #----- Hospitalizations Predictions -----#
+
+    #Create future dataframe for predictions
+    hosp_future = hosp_model.make_future_dataframe(periods = 4, freq = 'W')
+    
+    #Add regressor columns to future dataframe
+    #Multiplier to allow value alterations
+    hosp_future[columns] = state_deaths[columns] * multiplier
+    #Cap max vaccination rate at 100%
+    hosp_future[columns[0]].clip(upper = 100., inplace = True)
+    hosp_future[columns[1]].clip(upper = 100., inplace = True)
+    
+    #Create predictions, cap lower limit as 0
+    hosp_forecast = hosp_model.predict(hosp_future) 
+    hosp_forecast['yhat'].clip(lower = 0, inplace = True)        
+    
+    if multiplier == 1.:
+        pickle_deaths_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_deaths_forecast.pickle','wb')
+        pickle.dump(deaths_forecast, pickle_deaths_forecast)
+        pickle_deaths_forecast.close()
+
+        pickle_hosp_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_hosp_forecast.pickle','wb')
+        pickle.dump(hosp_forecast, pickle_hosp_forecast)
+        pickle_hosp_forecast.close()
+    
+    return deaths_forecast[['ds', 'yhat']], hosp_forecast[['ds', 'yhat']], deaths_future
+
+
