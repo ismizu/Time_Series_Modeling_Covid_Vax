@@ -6,7 +6,7 @@ The purpose of this project is two fold:
 2. Provide a sliding-scale to alter vaccination rates, visualizing the results
     - Visualize what a higher or lower vaccination rate could have led to in terms of hospitalizations and fatalities
 
-![pexels-artem-podrez-5878514.jpg](https://raw.githubusercontent.com/ismizu/Phase_3_Project/main/images/pexels-artem-podrez-5878514.jpg)
+![pexels-artem-podrez-5878514.jpg](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/pexels-artem-podrez-5878514.jpg)
 
 ##### Image by [Artem Podrez](https://www.pexels.com/@artempodrez) from [Pexels](https://www.pexels.com/)
 
@@ -44,9 +44,9 @@ Below, the following data is retrieved from Reich Lab at UMass-Amherst.
 
 A loop is run to allow the data to be separated/updated on a per-state basis.
 
-![data_clean_loop.png](https://raw.githubusercontent.com/ismizu/Phase_3_Project/main/images/data_clean_loop.png)
+![data_clean_loop.png](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/data_clean_loop.png)
 
-![data_per_state_example.png](https://raw.githubusercontent.com/ismizu/Phase_3_Project/main/images/data_per_state_example.png)
+![data_per_state_example.png](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/data_per_state_example.png)
 
 # Modeling
 
@@ -63,7 +63,7 @@ With the created models, visualizations are then created.
 
 The visualizations allow for alterations of vaccinations rates and show the potential changes in hospitalizations and fatalities should the vaccination rate reach, or fall, to such a level.
 
-![readme_nj_example.png](https://raw.githubusercontent.com/ismizu/Phase_3_Project/main/images/readme_nj_example.png)
+![readme_nj_example.png](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/readme_nj_example.png)
 
 The above is an example of the function's output.
 
