@@ -12,6 +12,9 @@ from prophet.diagnostics import cross_validation, performance_metrics
 import pickle
 import requests
 
+
+#---------- Data Upkeep Functions ----------#
+
 def vax_data_update():
     
     '''
@@ -174,6 +177,9 @@ def table_cleaner(state_abbreviated,
     pickle.dump(outliers, pickle_holidays)
     pickle_holidays.close()
 
+
+#---------- Modeling Functions ----------#
+
 def make_model(state_abbreviation):
     
     '''
@@ -313,6 +319,76 @@ def make_model(state_abbreviation):
     pickle_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','wb')
     pickle.dump(hosp_model, pickle_hosp_model)
     pickle_hosp_model.close()
+
+def visualization_predictions(state_abbreviation, multiplier):
+    
+    '''
+    Create predictions based on vax multiplier
+    '''
+    
+    #----- Data Load In ----- #
+    load_deaths_model = open(f'pickled_data/models_pickled/{state_abbreviation}_deaths_model.pickle','rb')
+    deaths_model = pickle.load(load_deaths_model)
+    load_deaths_model.close()
+    
+    load_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','rb')
+    hosp_model = pickle.load(load_hosp_model)
+    load_hosp_model.close()
+    
+    load_vax_pred = open(f'pickled_data/state_vax_pred_pickled/{state_abbreviation}_vax_pred_df.pickle','rb')
+    vax_pred_df = pickle.load(load_vax_pred)
+    load_vax_pred.close()
+    
+    #Separate deaths/hospitalizations and rename columns
+    state_deaths = vax_pred_df.drop(columns = 'hospitalizations').rename(columns = {'deaths': 'y'})
+    state_hospitalizations = vax_pred_df.drop(columns = 'deaths').rename(columns = {'hospitalizations': 'y'})
+    
+    #----- Fatality Predictions -----#
+    
+    #Create future dataframe for predictions
+    deaths_future = deaths_model.make_future_dataframe(periods = 4, freq = 'W')
+    
+    #Add regressor columns to future dataframe
+    columns = ['administered_dose1_pop_pct', 'series_complete_pop_pct']
+    #Multiplier to allow value alterations
+    deaths_future[columns] = state_deaths[columns] * multiplier
+    #Cap max vaccination rate at 100%
+    deaths_future[columns[0]].clip(upper = 100., inplace = True)
+    deaths_future[columns[1]].clip(upper = 100., inplace = True)
+    
+    #Create predictions, cap lower limit as 0
+    deaths_forecast = deaths_model.predict(deaths_future)
+    deaths_forecast['yhat'].clip(lower = 0, inplace = True)
+   
+    #----- Hospitalizations Predictions -----#
+
+    #Create future dataframe for predictions
+    hosp_future = hosp_model.make_future_dataframe(periods = 4, freq = 'W')
+    
+    #Add regressor columns to future dataframe
+    #Multiplier to allow value alterations
+    hosp_future[columns] = state_deaths[columns] * multiplier
+    #Cap max vaccination rate at 100%
+    hosp_future[columns[0]].clip(upper = 100., inplace = True)
+    hosp_future[columns[1]].clip(upper = 100., inplace = True)
+    
+    #Create predictions, cap lower limit as 0
+    hosp_forecast = hosp_model.predict(hosp_future) 
+    hosp_forecast['yhat'].clip(lower = 0, inplace = True)        
+    
+    if multiplier == 1.:
+        pickle_deaths_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_deaths_forecast.pickle','wb')
+        pickle.dump(deaths_forecast, pickle_deaths_forecast)
+        pickle_deaths_forecast.close()
+
+        pickle_hosp_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_hosp_forecast.pickle','wb')
+        pickle.dump(hosp_forecast, pickle_hosp_forecast)
+        pickle_hosp_forecast.close()
+    
+    return deaths_forecast[['ds', 'yhat']], hosp_forecast[['ds', 'yhat']], deaths_future
+
+
+#---------- Parameter Tuning Functions ----------#
 
 def score_check(state_abbreviation, save_df):
     
@@ -471,7 +547,7 @@ def main_params(state_abbreviation):
     
     #Create parameters
     deaths_param_grid = {  
-        'changepoint_prior_scale': [.5, 1, 3],
+        'changepoint_prior_scale': [.1, .5, 1, 3],
         'changepoint_range': [.85, .90, .95, 1],
         'n_changepoints': [30],
         'holidays': [state_outliers[state_outliers['holiday'] == 'deaths_outliers']]
@@ -500,7 +576,7 @@ def main_params(state_abbreviation):
     
     #Create parameters
     hosp_param_grid = {  
-        'changepoint_prior_scale': [.5, 1, 3, 4, 5],
+        'changepoint_prior_scale': [.1, .5, 1, 3, 4, 5],
         'changepoint_range': [.85, .90, .95, 1],
         'n_changepoints': [30],
         'holidays': [state_outliers[state_outliers['holiday'] == 'hosp_outliers']]
@@ -537,71 +613,184 @@ def main_params(state_abbreviation):
     pickle_hosp_params.close()
 
 
-def visualization_predictions(state_abbreviation, multiplier):
+#---------- Visualizations Functions ----------#
+
+def make_fig(state_abbreviation):
     
     '''
-    Create predictions based on vax multiplier
+    Create/save figure
+    '''
+        
+    # Create figure
+    fig = make_subplots(rows=2, cols=1,
+                        shared_xaxes = True,
+                        specs=[[{'type': 'scatter'}],
+                               [{'type': 'scatter'}]
+                              ],
+                        row_heights = [10,
+                                       20],
+                        subplot_titles=('Vaccination Rate',
+                                        'Weekly Hospitalizations & Fatalities')
+                       )
+
+
+    # Add traces, one for each slider step
+    for step in np.arange(0, 2, 0.05):
+
+        death_forecast, hosp_forecast, vax_df = visualization_predictions(state_abbreviation, step)
+
+        fig.add_traces(
+            [
+            go.Scatter(
+                visible = False,
+                line = dict(color = '#7dfffc', width=6),
+                name = 'Dose 1 Pop. %',
+                x = vax_df['ds'],
+                y = vax_df['administered_dose1_pop_pct']
+            ),
+            go.Scatter(
+                visible = False,
+                line = dict(color = '#7dff80', width=6),
+                name = 'Series Complete Pop. %',
+                x = vax_df['ds'],
+                y = vax_df['series_complete_pop_pct']
+            )
+            ],
+            rows = [1, 1], cols = [1, 1]
+        )
+
+        fig.add_traces(
+            [
+            go.Scatter(
+                visible = False,
+                line = dict(color = '#ff2828', width=6),
+                name = 'Fatalities',
+                x = death_forecast['ds'],
+                y = death_forecast['yhat']
+            ),
+            go.Scatter(
+                visible = False,
+                line = dict(color = '#ff9428', width=6),
+                name = 'Hospitalizations',
+                x = hosp_forecast['ds'],
+                y = hosp_forecast['yhat']
+            )
+            ],
+            rows = [2, 2], cols = [1, 1]
+        )
+
+    # Make middle trace visible
+    middle_trace = int(len(fig.data)/2)
+    for i in range(middle_trace, middle_trace + 4):
+        fig.data[i].visible = True
+
+    # Create and add slider
+    steps = []
+    for i in range(0, len(fig.data), 8):
+        step = dict(
+            method = 'update',
+            args = [{'visible': [False] * len(fig.data)},
+                    {'title': f'{state_abbreviation} Vaccine Rate Multipler at: ' + str(i/80)}],
+        )
+        step['args'][0]['visible'][i] = True
+        
+        # Set multiple traces to visible, unless reaching end of traces
+        try:
+            step['args'][0]['visible'][i+3] = True
+        except:
+            continue
+        try:
+            step['args'][0]['visible'][i+2] = True
+        except:
+            continue
+        try:
+            step['args'][0]['visible'][i+1] = True
+        except:
+            continue
+        steps.append(step)
+
+    sliders = [dict(
+        active = 10,
+        currentvalue = {'prefix': 'Vaccination Rate Multiplier: '},
+        pad = {'t': 50},
+        steps = steps
+    )]
+
+    fig.update_layout(
+        sliders = sliders,
+        yaxis_range = [0, 100]
+    )
+    
+    #Save/export graph
+    pickle_graph = open(f'pickled_data/graphs_pickled/{state_abbreviation}_graph.pickle', 'wb')
+    pickle.dump(fig, pickle_graph)
+    pickle_graph.close()
+
+
+def show_fig(state_abbreviation):
+    
+    '''
+    Read in figure and show
     '''
     
-    #----- Data Load In ----- #
-    load_deaths_model = open(f'pickled_data/models_pickled/{state_abbreviation}_deaths_model.pickle','rb')
-    deaths_model = pickle.load(load_deaths_model)
-    load_deaths_model.close()
-    
-    load_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','rb')
-    hosp_model = pickle.load(load_hosp_model)
-    load_hosp_model.close()
-    
-    load_vax_pred = open(f'pickled_data/state_vax_pred_pickled/{state_abbreviation}_vax_pred_df.pickle','rb')
-    vax_pred_df = pickle.load(load_vax_pred)
-    load_vax_pred.close()
-    
-    #Separate deaths/hospitalizations and rename columns
-    state_deaths = vax_pred_df.drop(columns = 'hospitalizations').rename(columns = {'deaths': 'y'})
-    state_hospitalizations = vax_pred_df.drop(columns = 'deaths').rename(columns = {'hospitalizations': 'y'})
-    
-    #----- Fatality Predictions -----#
-    
-    #Create future dataframe for predictions
-    deaths_future = deaths_model.make_future_dataframe(periods = 4, freq = 'W')
-    
-    #Add regressor columns to future dataframe
-    columns = ['administered_dose1_pop_pct', 'series_complete_pop_pct']
-    #Multiplier to allow value alterations
-    deaths_future[columns] = state_deaths[columns] * multiplier
-    #Cap max vaccination rate at 100%
-    deaths_future[columns[0]].clip(upper = 100., inplace = True)
-    deaths_future[columns[1]].clip(upper = 100., inplace = True)
-    
-    #Create predictions, cap lower limit as 0
-    deaths_forecast = deaths_model.predict(deaths_future)
-    deaths_forecast['yhat'].clip(lower = 0, inplace = True)
-   
-    #----- Hospitalizations Predictions -----#
+    load_graph = open(f'pickled_data/graphs_pickled/{state_abbreviation}_graph.pickle','rb')
+    fig = pickle.load(load_graph)
+    load_graph.close()
 
-    #Create future dataframe for predictions
-    hosp_future = hosp_model.make_future_dataframe(periods = 4, freq = 'W')
-    
-    #Add regressor columns to future dataframe
-    #Multiplier to allow value alterations
-    hosp_future[columns] = state_deaths[columns] * multiplier
-    #Cap max vaccination rate at 100%
-    hosp_future[columns[0]].clip(upper = 100., inplace = True)
-    hosp_future[columns[1]].clip(upper = 100., inplace = True)
-    
-    #Create predictions, cap lower limit as 0
-    hosp_forecast = hosp_model.predict(hosp_future) 
-    hosp_forecast['yhat'].clip(lower = 0, inplace = True)        
-    
-    if multiplier == 1.:
-        pickle_deaths_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_deaths_forecast.pickle','wb')
-        pickle.dump(deaths_forecast, pickle_deaths_forecast)
-        pickle_deaths_forecast.close()
+    fig.show()
 
-        pickle_hosp_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_hosp_forecast.pickle','wb')
-        pickle.dump(hosp_forecast, pickle_hosp_forecast)
-        pickle_hosp_forecast.close()
+def initial_fig(state_abbreviation):
     
-    return deaths_forecast[['ds', 'yhat']], hosp_forecast[['ds', 'yhat']], deaths_future
+    '''
+    Read in initial figures and show
+    '''
+    
+    load_graph = open(f'pickled_data/initial_graphs_pickled/{state_abbreviation}_graph.pickle','rb')
+    fig = pickle.load(load_graph)
+    load_graph.close()
+
+    fig.show()
+
+#---------- Manual Tuning Functions ----------#
+
+def check_(state_abbreviation):
+    load_deaths_params = open(f'pickled_data/model_params/{state_abbreviation}_deaths_params.pickle','rb')
+    deaths_params = pickle.load(load_deaths_params)
+    load_deaths_params.close()
+
+    load_hosp_params = open(f'pickled_data/model_params/{state_abbreviation}_hosp_params.pickle','rb')
+    hosp_params = pickle.load(load_hosp_params)
+    load_hosp_params.close()
+    return print(f'''{state_abbreviation} Deaths: Rnge: {deaths_params['changepoint_range']} Prior: {deaths_params['changepoint_prior_scale']}
+{state_abbreviation} Hosp: Rnge: {hosp_params['changepoint_range']} Prior: {hosp_params['changepoint_prior_scale']}''')
+
+def manual_tune(state_abbreviation,
+                death_changepoint_range,
+                death_changepoint_prior_scale,
+                hosp_changepoint_range,
+                hosp_changepoint_prior_scale):
+    
+    
+    deaths_params = {'changepoint_range': None,
+                     'changepoint_prior_scale': None}
+    
+
+    
+    hosp_params = {'changepoint_range': None,
+                   'changepoint_prior_scale': None}
+    
+    
+    deaths_params['changepoint_range'] = death_changepoint_range
+    deaths_params['changepoint_prior_scale'] = death_changepoint_prior_scale
+    hosp_params['changepoint_range'] = hosp_changepoint_range
+    hosp_params['changepoint_prior_scale'] = hosp_changepoint_prior_scale
+    
+    pickle_deaths_params = open(f'pickled_data/model_params/{state_abbreviation}_deaths_params.pickle','wb')
+    pickle.dump(deaths_params, pickle_deaths_params)
+    pickle_deaths_params.close()
+    
+    pickle_hosp_params = open(f'pickled_data/model_params/{state_abbreviation}_hosp_params.pickle','wb')
+    pickle.dump(hosp_params, pickle_hosp_params)
+    pickle_hosp_params.close()
 
 
