@@ -1,0 +1,6 @@
+channels:
+  - defaults
+dependencies:
+  - ipython
+  - ipywidgets
+  - pickle
