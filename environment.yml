@@ -4,3 +4,4 @@ dependencies:
   - ipython
   - ipywidgets
   - plotly
+  - numpy
