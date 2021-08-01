@@ -1,7 +1,0 @@
-channels:
-  - defaults
-dependencies:
-  - ipython
-  - ipywidgets
-  - plotly
-  - numpy
