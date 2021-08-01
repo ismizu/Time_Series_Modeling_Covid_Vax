@@ -57,8 +57,6 @@ Following the creation of state-dependent dataframes, a function is used to crea
 4. Save and export the models
 >Vaccination numbers are used as exogenous variables to predict hospitalizations and fatalities. As such, their future values are needed in order to make future predictions on hospitalizations and fatalities. Therefore, an additional machine learning model is required to create those predictions.
 
-    > Note: All script cells reload the states dictionary. Scripts load data by default, allowing them to be run independent of each other. As such, the states are reloaded each time to negate dependence on running previous cells.
-
 With the created models, visualizations are then created.
 
 The visualizations allow for alterations of vaccinations rates and show the potential changes in hospitalizations and fatalities should the vaccination rate reach, or fall, to such a level.
