@@ -717,9 +717,11 @@ def make_fig(state_abbreviation):
     )]
 
     fig.update_layout(
+        autosize = True,
         sliders = sliders,
-        yaxis_range = [0, 100]
-    )
+        yaxis_range = [0, 100],
+        hovermode = 'x'
+    )s
     
     #Save/export graph
     pickle_graph = open(f'pickled_data/graphs_pickled/{state_abbreviation}_graph.pickle', 'wb')
