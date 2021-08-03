@@ -7,18 +7,19 @@ st.set_page_config(layout = 'wide', initial_sidebar_state = 'collapsed')
 st.title('COVID-19: Vaccination Rate Simulator')
 st.markdown('> ### Select a state from the dropdown menu to begin.')
 st.sidebar.markdown('''The following models require additional tuning:
-- Colorado
 - Hawaii
 - Maine
 - Minnesota
-- New Hampshire
+- New Mexico
+- Ohio
 - Oregon
-- Pennsylvania
-- West Virgina
+- South Dakota
+- Virginia
+- Wisconsin
 ''')
-expander = st.sidebar.beta_expander('What\'s wrong and what needs to be tuned?')
-expander.markdown('''Currently, the model increases hospitalizations\
- and fatalities when the vaccination rate increases.
+sidebar_problem = st.sidebar.beta_expander('What\'s wrong?')
+sidebar_problem.markdown('''Currently, the models do not accurately alter hospitalizations \
+and fatalities as the vaccination rate changes.
 
 #### Why does this happen?
 
@@ -34,12 +35,22 @@ Changepoint range indicates how far into the data you wish to account for change
 
 Changepoint prior scale indicates how sensitive you want the model to be when looking for changepoints.
 
-Thus, if the changepoint range ends during an upward trend in hospitalizations or fatalities, \
-and the changepoint prior scale is set to a sensitivity to catch this upward trend, \
-Prophet will set the trend to increase from now on. Since the predictions use vaccination rates \
-to help make predictions, the new trend only sees an increasing COVID case rate as well as the \
-increasing vaccination rate. Thus, the model predictions reverse. Sizeably so when the vaccination rate \
-is multiplied.''')
+The predictions utilize vaccination rates to predict the target variables (hospitalizations and fatalities). \
+Thus, if the changepoint range and sensitivity detect a changepoint during an upward trend, \
+the trend will be set to an increase in the target variables. What the model will then believe is \
+that the increasing vaccination rate is to blame.''')
+
+sidebar_problem_fix = st.sidebar.beta_expander('What can be done?')
+sidebar_problem_fix.markdown('''There are some fixes that are currently in the works:
+
+1. Adjust the changepoint variables:
+>- Adjustments can be made to help the model capture the general trend. \
+As opposed to capturing many smaller trends.
+
+2. Large increases in hospitalizations and fatalities can be linked to specific events \
+(Such as the emergence of the delta strain)
+>- The dates of these events can be entered into Facebook Prophet to help it \
+identify the overall trend by understanding where anomalies are.''')
 
 def get_base64(bin_file):
     with open(bin_file, 'rb') as f:
@@ -63,9 +74,9 @@ set_background('images/blank.png')
 st.markdown(
         """
 <style>
-    .reportview-container .main .block-container{{
+    .reportview-container .main .block-container{
         max-width: 1440px;
-    }}
+    }
 </style>
 """,
         unsafe_allow_html=True,

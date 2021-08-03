@@ -376,6 +376,7 @@ def visualization_predictions(state_abbreviation, multiplier):
     hosp_forecast = hosp_model.predict(hosp_future) 
     hosp_forecast['yhat'].clip(lower = 0, inplace = True)        
     
+    #Save base forecasts
     if multiplier == 1.:
         pickle_deaths_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_deaths_forecast.pickle','wb')
         pickle.dump(deaths_forecast, pickle_deaths_forecast)
@@ -721,7 +722,7 @@ def make_fig(state_abbreviation):
         sliders = sliders,
         yaxis_range = [0, 100],
         hovermode = 'x'
-    )s
+    )
     
     #Save/export graph
     pickle_graph = open(f'pickled_data/graphs_pickled/{state_abbreviation}_graph.pickle', 'wb')
