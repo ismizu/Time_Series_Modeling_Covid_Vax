@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import itertools
+import datetime
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -723,13 +724,58 @@ def make_fig(state_abbreviation):
         yaxis_range = [0, 100],
         hovermode = 'x'
     )
+    #Plotly glitch:
+    #If using datetime & vline annoation, x must be milliseconds
+
+    #Get first vax index
+    first_vax_index = vax_df[vax_df['administered_dose1_pop_pct'] > 0]['ds'].index[0]
+
+    #Get year, month, date
+    first_year = int(str(vax_df['ds'][first_vax_index])[:4])
+    first_month = int(str(vax_df['ds'][first_vax_index])[5:7])
+    first_day = int(str(vax_df['ds'][first_vax_index])[8:10])
+
+    #Convert to milliseconds
+    date_milliseconds = datetime.datetime(first_year, first_month, first_day).timestamp() * 1000
+
+    #Create vertical line for first vax
+    fig.add_vline(x = date_milliseconds,
+                  line_width = 3,
+                  line_dash = 'dash',
+                  line_color = 'green',
+                  row = 2,
+                  annotation_text = 'First Vaccinations',
+                  annotation_position = 'left')
+
+    predictions_begin = vax_df.index[-4]
+    pred_year = int(str(vax_df['ds'][predictions_begin])[:4])
+    pred_month = int(str(vax_df['ds'][predictions_begin])[5:7])
+    pred_day = int(str(vax_df['ds'][predictions_begin])[8:10])
+
+    pred_milliseconds = datetime.datetime(pred_year, pred_month, pred_day).timestamp() * 1000
+
+    fig.add_vline(x = pred_milliseconds,
+                  line_width = 3,
+                  line_dash = 'dash',
+                  line_color = 'blue',
+                  row = 2,
+                  annotation_text = 'Predictions begin',
+                  annotation_position = 'left')
     
-    #Save/export graph
+    #Save/export graph to main directory
     pickle_graph = open(f'pickled_data/graphs_pickled/{state_abbreviation}_graph.pickle', 'wb')
     pickle.dump(fig, pickle_graph)
     pickle_graph.close()
-
-
+    
+    #Save/export graph as dict for web app
+    try:
+        fig_dict = fig.to_dict()
+        pickle_graph = open(f'../covid_web_app/pickled_data/graphs_pickled/{state_abbreviation}_graph_dict.pickle', 'wb')
+        pickle.dump(fig_dict, pickle_graph)
+        pickle_graph.close()
+    except:
+        return print('web app directory not found')
+    
 def show_fig(state_abbreviation):
     
     '''
@@ -796,4 +842,42 @@ def manual_tune(state_abbreviation,
     pickle.dump(hosp_params, pickle_hosp_params)
     pickle_hosp_params.close()
 
+#---------- Component Plots ----------#
 
+def create_component_plots(state_abbreviation):
+    
+    '''
+    Create/save fbprophet components
+    '''
+    
+    #----- Data Load In -----#
+    load_deaths_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_deaths_forecast.pickle','rb')
+    deaths_forecast = pickle.load(load_deaths_forecast)
+    load_deaths_forecast.close()
+    
+    load_hosp_forecast = open(f'pickled_data/forecasts/{state_abbreviation}_hosp_forecast.pickle','rb')
+    hosp_forecast = pickle.load(load_hosp_forecast)
+    load_hosp_forecast.close()
+
+    load_deaths_model = open(f'pickled_data/models_pickled/{state_abbreviation}_deaths_model.pickle','rb')
+    deaths_model = pickle.load(load_deaths_model)
+    load_deaths_model.close()
+    
+    load_hosp_model = open(f'pickled_data/models_pickled/{state_abbreviation}_hosp_model.pickle','rb')
+    hosp_model = pickle.load(load_hosp_model)
+    load_hosp_model.close()
+    
+    #Create plot of components
+    deaths_forecast_plot = deaths_model.plot_components(deaths_forecast)
+    hosp_forecast_plot = hosp_model.plot_components(hosp_forecast)
+    
+    #Save plots as .jpg to main directory
+    deaths_forecast_plot.savefig(f'pickled_data/forecast_plots/{state_abbreviation}_deaths_forecast_plot.jpg')
+    hosp_forecast_plot.savefig(f'pickled_data/forecast_plots/{state_abbreviation}_hosp_forecast_plot.jpg')
+    
+    #Save plots as .jpg to web app directory
+    try:
+        deaths_forecast_plot.savefig(f'../covid_web_app/pickled_data/forecast_plots/{state_abbreviation}_deaths_forecast_plot.jpg')
+        hosp_forecast_plot.savefig(f'../covid_web_app/pickled_data/forecast_plots/{state_abbreviation}_hosp_forecast_plot.jpg')       
+    except:
+        return print('no web app directory')
