@@ -1,10 +1,12 @@
 # Visualizing COVID Hospitalizations and Fatalities based on Vaccination Rate
 
-The purpose of this project is two fold:
+The purpose of this project is three fold:
 1. Predict the hospitalizations and fatalities due to COVID-19 for the next four weeks
     - Providing insight for healthcare facilities, vaccination clinics
 2. Provide a sliding-scale to alter vaccination rates, visualizing the results
     - Visualize what a higher or lower vaccination rate could have led to in terms of hospitalizations and fatalities
+3. Deploy visualizations in an interactive web application
+    - Web app can be found [here](https://covidmodellingproject.weebly.com/)
 
 ![pexels-artem-podrez-5878514.jpg](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/pexels-artem-podrez-5878514.jpg)
 
@@ -66,6 +68,22 @@ The visualizations allow for alterations of vaccinations rates and show the pote
 The above is an example of the function's output.
 
 With everything ready, the figure creation function is run for all states.
+
+# Deployment
+
+With the model's created, I also wanted to include some basic insights. An item that would give more background information on how the models work, while not overwhelming the user.
+
+For this, I chose to include fbprophet's component plots.
+
+Below, I show New Jersey's baseline hospitalizations model (no multiplier) as example. The components are as follows:
+
+- **Trend:** The baseline trend that is seen in the data minus all exogenous variables
+- **Holidays:** The amount of difference from the standard trend detected by prophet for the included outlier points
+- **Extra Regressors:** The change that the exogenous variables created in the baseline trend. This would be vaccination rate in the case of this project
+
+![component_plot.png](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/component_plot.png)
+
+The final Web App can be found [here](https://covidmodellingproject.weebly.com/).
 
 # Final Statements
 
