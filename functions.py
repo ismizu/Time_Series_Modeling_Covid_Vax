@@ -746,14 +746,19 @@ def make_fig(state_abbreviation):
                   row = 2,
                   annotation_text = 'First Vaccinations',
                   annotation_position = 'left')
-
+    
+    #Get Prediction date index
     predictions_begin = vax_df.index[-4]
+    
+    #Get year, month, date
     pred_year = int(str(vax_df['ds'][predictions_begin])[:4])
     pred_month = int(str(vax_df['ds'][predictions_begin])[5:7])
     pred_day = int(str(vax_df['ds'][predictions_begin])[8:10])
-
+    
+    #Convert to milliseconds
     pred_milliseconds = datetime.datetime(pred_year, pred_month, pred_day).timestamp() * 1000
-
+    
+    #Create vertical line for prediction start date
     fig.add_vline(x = pred_milliseconds,
                   line_width = 3,
                   line_dash = 'dash',
