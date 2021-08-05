@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Readme notebook
+Untitled.ipynb
+
+# Previous Code
+Previous_Data_Code.ipynb
