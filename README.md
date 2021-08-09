@@ -7,6 +7,7 @@ The purpose of this project is three fold:
     - Visualize what a higher or lower vaccination rate could have led to in terms of hospitalizations and fatalities
 3. Deploy visualizations in an interactive web application
     - Web app can be found [here](https://covidmodellingproject.weebly.com/)
+    - Web app repository can be found [here](https://github.com/ismizu/covid_web_app)
 
 ![app_example.gif](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/app_example.gif)
 
