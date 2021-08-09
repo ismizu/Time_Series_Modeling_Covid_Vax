@@ -8,9 +8,7 @@ The purpose of this project is three fold:
 3. Deploy visualizations in an interactive web application
     - Web app can be found [here](https://covidmodellingproject.weebly.com/)
 
-![pexels-artem-podrez-5878514.jpg](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/pexels-artem-podrez-5878514.jpg)
-
-##### Image by [Artem Podrez](https://www.pexels.com/@artempodrez) from [Pexels](https://www.pexels.com/)
+![app_example.gif](https://github.com/ismizu/Time_Series_Modeling_Covid_Vax/blob/main/images/app_example.gif)
 
 ## Repository Structure
 
