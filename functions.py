@@ -177,7 +177,13 @@ def table_cleaner(state_abbreviated,
     pickle_holidays = open(f'pickled_data/state_data_pickled/{state_abbreviated}_outliers.pickle','wb')
     pickle.dump(outliers, pickle_holidays)
     pickle_holidays.close()
-
+    
+    try:
+        pickle_final_df = open(f'../covid_web_app/pickled_data/state_data_pickled/{state_abbreviated}_final_df.pickle','wb')
+        pickle.dump(final_df, pickle_final_df)
+        pickle_final_df.close()
+    except:
+        return print('web app directory not found')
 
 #---------- Modeling Functions ----------#
 
